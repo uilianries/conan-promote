@@ -1,0 +1,53 @@
+cache:
+  paths:
+    - "$CI_PROJECT_DIR/pip-cache"
+  key: "$CI_PROJECT_ID"
+
+stages:
+  - test
+  - deploy
+
+.conan-upgrade: &conan-upgrade
+  before_script:
+    - sudo pip install --upgrade setuptools --cache-dir $CI_PROJECT_DIR/pip-cache
+    - sudo pip install --upgrade conan_package_tools --cache-dir $CI_PROJECT_DIR/pip-cache
+    - sudo pip install -r conan/requirements_dev.txt --cache-dir $CI_PROJECT_DIR/pip-cache
+    - conan user
+
+test-conan-promote:
+  image: lasote/conangcc54
+  variables:
+    PYTHONPATH: "${PYTHONPATH}:${PWD}"
+  stage: test
+  <<: *conan-upgrade
+  script:
+    - nosetests .
+  tags:
+    - docker
+
+pylint:
+  image: lasote/conangcc54
+  stage: test
+  <<: *conan-upgrade
+  script:
+    - pylint conan/main.py
+    - pylint conan/conan_promote.py
+    - pylint conan/test/promote_test.py
+  tags:
+    - docker
+
+stagging-deploy:
+  image: lasote/conangcc54
+  stage: deploy
+  <<: *conan-upgrade
+  script:
+    - sudo python setup.py sdist
+  tags:
+    - docker
+  artifacts:
+    name: "$CI_JOB_NAME"
+    when: on_success
+    paths:
+    - dist/
+  only:
+    - master
